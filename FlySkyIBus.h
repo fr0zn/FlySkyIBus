@@ -12,6 +12,7 @@ class FlySkyIBus
 public:
   void begin(HardwareSerial& serial);
   void begin(Stream& stream);
+  void initWriteBuffer();
   void loop(void);
   uint16_t readChannel(uint8_t channelNr);
   void writeChannel(uint8_t channelNr, uint16_t value);
@@ -47,8 +48,9 @@ private:
   uint8_t ptr;
   uint8_t len;
   uint8_t buffer[PROTOCOL_LENGTH];
-  uint8_t wbuffer[PROTOCOL_LENGTH+1];
+  uint8_t w_buffer[PROTOCOL_LENGTH];
   uint16_t chksum;
+  uint16_t w_chksum;
   uint8_t lchksum;
   
   uint16_t channel[PROTOCOL_CHANNELS];
