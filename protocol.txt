@@ -1,0 +1,56 @@
+                                                                       
+  ┌─16 bits────┐                                                       
+  │            │                                                       
+  ┌─────────────────────64 bits───────────────────────┐                
+  │                                                   │                
+  ┌─────┬──────┬────────────┬────────────┬────────────┐───┐            
+  │ LEN │ CMD  │     C1     │     C2     │     C3     │   │            
+  ├─────┴──────┼────────────┼────────────┼────────────┤   │            
+  │     C4     │     C5     │     C6     │     C7     │   │            
+  ├────────────┼────────────┼────────────┼────────────┤   │ 256 bits   
+  │     C8     │     C9     │     C10    │     C11    │   (0x20 bytes) 
+  ├────────────┼────────────┼────────────┼─────┬──────┤   │            
+  │     C12    │     C13    │     C14    │ CHL │ CHH  │   │            
+  └────────────┴────────────┴────────────┴─────┴──────┘───┘            
+                                         │     │                       
+                                         └─────┘                       
+                                         8 bits   
+
+PROTOCOL_TIME: 7ms
+PROTOCOL_TIME_GAP: 3ms               
+                                                                      
+LEN: 0x20
+CMD: 0x40
+Cx : 0x3E8 <-> 0x7D0 (1000 to 2000) [half 0x5DC (stable)] [big-endian]
+  C1 (serial) = 0xdc 0x5 -> 0x5dc
+CHECKSUM:
+  checksum = CHH << 8 + CHL
+  checksum == 0xFFFF - LEN - C1(byte0) - C1(byte1) - Cx(byte0) - Cx(byte1)
+
+Example serial data:
+
+
+LEN.|CMD | CHAN 1  | CHAN 2  | CHAN 3  |
+0x20|0x40|0xdd 0x05|0xdd 0x05|0xef 0x03|
+----------------------------------------
+0xdd 0x05 0xd0 0x07 0xd0 0x07 0xdc 0x05 
+0xdc 0x05 0xdc 0x05 0xdc 0x05 0xdc 0x05 
+                              ---------- 
+0xdc 0x05 0xdc 0x05 0xdc 0x05|0x51|0xf3|
+                             |CHL |CHH |
+
+CHAN1 = 0x5dd
+CHAN2 = 0x5dd
+CHAN3 = 0x3ef
+....
+CHAN13 = 0x5dc
+CHAN14 = 0x5dc
+
+Checksum =
+  0xffff - 0x20 - 0x40 - 0xdd - 0x05 - 0xdd - 0x05 - 0xef - 0x03 - 0xdd - 0x05 
+  - 0xd0 - 0x07 - 0xd0 - 0x07 - 0xdc - 0x05 - 0xdc - 0x05 - 0xdc - 0x05 - 0xdc
+  - 0x05 - 0xdc - 0x05 - 0xdc - 0x05 - 0xdc - 0x05 - 0xdc - 0x05 = 0xf351
+
+Checsum = CHH << 8 + CHL -> 0xf351
+
+
