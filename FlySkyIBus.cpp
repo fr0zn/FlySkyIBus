@@ -31,18 +31,30 @@ void FlySkyIBus::begin(Stream& stream)
 
 void FlySkyIBus::initWriteBuffer(){
 
-  w_chksum = 0xf2c5 // Base checksum value with all channels to LOW_VALUE
+  uint8_t tmp;
+  uint8_t tmp2;
+
+  w_chksum = 0xff9f; // Base checksum value with LEN and CMD substracted
 
   w_buffer[0] = 0x20; // LEN
   w_buffer[1] = 0x40; // CMD
 
   for (int i = 2; i < PROTOCOL_LENGTH - 2; i += 2 ) // All channels fill
   {
-    tmp = LOW_VALUE & 0xff;
-    w_buffer[i] = tmp;
+    if (i == 10 || i == 12) // AUX1 and AUX2
+    {
+      tmp = HIGH_VALUE & 0xff;
+      tmp2 = HIGH_VALUE >> 8;
+    }else{
+      tmp = HALF_VALUE & 0xff;
+      tmp2 = HALF_VALUE >> 8;
+    }
 
-    tmp = LOW_VALUE >> 8;
-    w_buffer[i+1] = tmp;
+    w_buffer[i] = tmp;
+    w_chksum -= tmp;
+
+    w_buffer[i+1] = tmp2;
+    w_chksum -= tmp2;
   }
 
   w_buffer[PROTOCOL_LENGTH-2] = w_chksum & 0xff;
@@ -53,22 +65,25 @@ void FlySkyIBus::initWriteBuffer(){
 
 void FlySkyIBus::writeToChannel(uint8_t channelNr, uint16_t value){
 
-  uint8_t new_value_tmp;
+  uint16_t old_value_tmp; // 16 bits in case that overflows the byte
+  uint16_t new_value_tmp; // 16 bits in case that overflows the byte
+  uint16_t checksum;
 
-  uint8_t checksum0;
-  uint8_t checksum1;
+  // get old channel data and checkum
+  old_value_tmp = w_buffer[channelNr*2] + w_buffer[channelNr*2+1];
+  new_value_tmp = (value & 0xff) + (value >> 8 & 0xff);
+  checksum = w_buffer[PROTOCOL_LENGTH-2] | w_buffer[PROTOCOL_LENGTH-1] << 8;
 
-  new_value_tmp = value & 0xff;
-  w_buffer[channelNr*2] = new_value_tmp;
-  checksum0 = w_buffer[PROTOCOL_LENGTH-2]  - (new_value_tmp - w_buffer[channelNr*2])
-  
+  // calculate new checksum without iterating over all the data again
+  checksum = checksum + old_value_tmp - new_value_tmp;
 
-  new_value_tmp = value >> 8;
-  w_buffer[channelNr*2+1] = new_value_tmp;
-  checksum1 = w_buffer[PROTOCOL_LENGTH-1]  - (new_value_tmp - w_buffer[channelNr*2+1])
+  // value
+  w_buffer[channelNr*2] = value & 0xff;
+  w_buffer[channelNr*2+1] = value >> 8 & 0xff;
 
-  w_buffer[PROTOCOL_LENGTH-2] = checksum0 & 0xff;
-  w_buffer[PROTOCOL_LENGTH-1] = checksum1 & 0xff;
+  // checksum
+  w_buffer[PROTOCOL_LENGTH-2] = checksum & 0xff;
+  w_buffer[PROTOCOL_LENGTH-1] = checksum >> 8 & 0xff;
 
 }
 
@@ -78,17 +93,12 @@ void FlySkyIBus::writeLoop(void){
 
   if (now - last >= PROTOCOL_TIME)
   {
-    state = WRITE_STATE;
     last = now;
-  }
-
-  if (state == WRITE_STATE)
-  {
     stream->write(w_buffer, PROTOCOL_LENGTH);
   }
 }
 
-void FlySkyIBus::loop(void)
+void FlySkyIBus::readLoop(void)
 {
   // If serial data
   while (stream->available() > 0)

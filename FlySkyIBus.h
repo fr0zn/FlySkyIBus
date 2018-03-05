@@ -12,10 +12,10 @@ class FlySkyIBus
 public:
   void begin(HardwareSerial& serial);
   void begin(Stream& stream);
-  void initWriteBuffer();
-  void loop(void);
+  void writeLoop(void);
+  void readLoop(void);
   uint16_t readChannel(uint8_t channelNr);
-  void writeChannel(uint8_t channelNr, uint16_t value);
+  void writeToChannel(uint8_t channelNr, uint16_t value);
 
 private:
   // Used as a state machine
@@ -26,7 +26,6 @@ private:
     GET_CHKSUML,
     GET_CHKSUMH,
     DISCARD,
-    WRITE_STATE,
   };
 
   static const uint8_t PROTOCOL_CHANNELS = 10;
@@ -44,6 +43,7 @@ private:
 
   Stream* stream;
   uint8_t state;
+  uint8_t w_state;
   uint32_t last;
   uint8_t ptr;
   uint8_t len;
@@ -54,6 +54,8 @@ private:
   uint8_t lchksum;
   
   uint16_t channel[PROTOCOL_CHANNELS];
+
+  void initWriteBuffer();
   
 };
 
