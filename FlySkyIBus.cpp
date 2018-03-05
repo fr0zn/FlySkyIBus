@@ -5,20 +5,23 @@
 #include <Arduino.h>
 #include "FlySkyIBus.h"
 
-#define DEBUG 1
+#define DEBUG 0
 
 FlySkyIBus IBus;
 
-void FlySkyIBus::begin(HardwareSerial& serial)
+void FlySkyIBus::begin(HardwareSerial& serial, HardwareSerial& serialr)
 {
   serial.begin(115200);
-  begin((Stream&)serial);
+  serialr.begin(115200);
+  begin((Stream&)serial, (Stream&)serialr);
 }
 
-void FlySkyIBus::begin(Stream& stream)
+void FlySkyIBus::begin(Stream& stream, Stream& streamr)
 {
   this->stream = &stream;
+  this->streamr = &streamr;
   this->state = DISCARD;
+  this->last_r = millis();
   this->last = millis();
   this->ptr = 0;
   this->len = 0;
@@ -39,9 +42,9 @@ void FlySkyIBus::initWriteBuffer(){
   w_buffer[0] = 0x20; // LEN
   w_buffer[1] = 0x40; // CMD
 
-  for (int i = 2; i < PROTOCOL_LENGTH - 2; i += 2 ) // All channels fill
+  for (int i = 1; i < PROTOCOL_MAX_CHANNELS + 1; i++ ) // All channels fill
   {
-    if (i == 10 || i == 12) // AUX1 and AUX2
+    if (i == AUX1 || i == AUX2) // AUX1 and AUX2
     {
       tmp = HIGH_VALUE & 0xff;
       tmp2 = HIGH_VALUE >> 8;
@@ -50,10 +53,10 @@ void FlySkyIBus::initWriteBuffer(){
       tmp2 = HALF_VALUE >> 8;
     }
 
-    w_buffer[i] = tmp;
+    w_buffer[i*2] = tmp; // +2 because LEN and CMD
     w_chksum -= tmp;
 
-    w_buffer[i+1] = tmp2;
+    w_buffer[i*2+1] = tmp2;
     w_chksum -= tmp2;
   }
 
@@ -101,19 +104,19 @@ void FlySkyIBus::writeLoop(void){
 void FlySkyIBus::readLoop(void)
 {
   // If serial data
-  while (stream->available() > 0)
+  while (streamr->available() > 0)
   {
     uint32_t now = millis();
 
     // restart state, after 7/2 ms
-    if (now - last >= PROTOCOL_TIMEGAP)
+    if (now - last_r >= PROTOCOL_TIMEGAP)
     {
       state = GET_LENGTH;
     }
 
-    last = now;
+    last_r = now;
     
-    uint8_t value = stream->read(); // Read serial
+    uint8_t value = streamr->read(); // Read serial
 
     // State machine
     switch (state)
@@ -134,13 +137,6 @@ void FlySkyIBus::readLoop(void)
         break;
 
       case GET_DATA:
-
-        if (DEBUG)
-        {
-          char b[16];
-          sprintf(b, "DTA: 0x%x", value);
-          stream->println(b);
-        }
 
         buffer[ptr++] = value;
         chksum -= value;
@@ -191,7 +187,7 @@ uint16_t FlySkyIBus::readChannel(uint8_t channelNr)
 {
   if (channelNr < PROTOCOL_CHANNELS)
   {
-    return channel[channelNr];
+    return channel[channelNr-1];
   }
   else
   {

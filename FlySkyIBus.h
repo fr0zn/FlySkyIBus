@@ -4,14 +4,32 @@
 
 #include <inttypes.h>
 
+enum Channels
+{
+  ROLL=1,
+  PITCH,
+  THROTTLE,
+  YAW,
+  AUX1,
+  AUX2,
+  AUX3,
+  AUX4,
+  AUX5,
+  AUX6,
+  AUX7,
+  AUX8,
+  AUX9,
+  AUX10,
+};
+
 class HardwareSerial;
 class Stream;
 
 class FlySkyIBus
 {
 public:
-  void begin(HardwareSerial& serial);
-  void begin(Stream& stream);
+  void begin(HardwareSerial& serial, HardwareSerial& serialr);
+  void begin(Stream& stream, Stream& streamr);
   void writeLoop(void);
   void readLoop(void);
   uint16_t readChannel(uint8_t channelNr);
@@ -28,6 +46,7 @@ private:
     DISCARD,
   };
 
+  static const uint8_t PROTOCOL_MAX_CHANNELS = 14;
   static const uint8_t PROTOCOL_CHANNELS = 10;
 
   static const uint8_t PROTOCOL_LENGTH = 0x20; // 32 bytes
@@ -42,9 +61,11 @@ private:
 
 
   Stream* stream;
+  Stream* streamr;
   uint8_t state;
   uint8_t w_state;
   uint32_t last;
+  uint32_t last_r;
   uint8_t ptr;
   uint8_t len;
   uint8_t buffer[PROTOCOL_LENGTH];
